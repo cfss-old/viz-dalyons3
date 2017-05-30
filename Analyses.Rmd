@@ -1,0 +1,640 @@
+---
+title: "Neurophysiological responses to threatening visual stimuli in light of aggression experienced and committed aggression"
+author: "Nicole Sullivan"
+date: "June 2017"
+output: pdf_document
+---
+
+\centering
+\raggedright
+\newpage
+\tableofcontents
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(haven)
+library(pander)
+library(modelr)
+library(stargazer)
+
+## Import, Tidying, Joining, Readying for Analyses
+
+#Import
+path <- dir("csv", pattern = "\\.csv$", full.names = TRUE)
+
+ERD <- map_df(path, read_csv)
+
+survey <- read_sav("Theta_20162017.sav")
+erp <- read_sav("mean_ampl_300_600_49_subjects.sav")
+
+#Tidy ERD data
+erd <- ERD %>%
+  separate(Electrode, into = c("Electrode", "delete"), sep = "_") %>%
+  select(-delete) %>%
+  separate(Subject, into = c("Task_Expression", "Subject"), sep = "_") %>%
+  separate(Task_Expression, into = c("Task", "Expression"), sep = 1) %>%
+  separate (Subject, into = c("Initials", "ID"), sep = 2) %>%
+  select(-Initials)
+
+#Tidy ERP data
+erp_id <- erp %>%
+  separate(Subject, into = c("Initials", "ID"), sep = 2) %>%
+  mutate(ID = ifelse(ID == "3005712", 3005172, ID)) %>%
+  mutate(ID = factor(ID)) %>%
+  select(-Initials)
+
+#Tidy survey data
+survey_tidy <- survey %>%
+  select(CNPRUID, IEDINT_C, ied_c, LHAclini_agg, LHEA_self_Total, AGERTG, SEX, RACE) %>%
+  gather(IEDINT_C, IEDINT_C, ied_c, key = "IED_type", value = "IED") %>%
+  filter(IED != "NaN") %>%
+  select(-IED_type) %>%
+  rename(ID = CNPRUID,
+         LHA = LHAclini_agg,
+         LHEA = LHEA_self_Total,
+         Age = AGERTG,
+         Sex = SEX,
+         Race = RACE) %>%
+  mutate(ID = factor(ID),
+         IED = factor(IED))
+
+#Join survey & ERP data
+erp_survey <- inner_join(erp_id, survey_tidy, by = "ID")
+
+#Check all vars added correctly (also check correct no. of vars)
+#names(erp_survey)
+
+#Tidy joined survey and ERP
+erp_survey_tidy <- erp_survey %>%
+  gather(2:109, key = "Task_exp_electrode", value = "Mean_Amplitude") %>%
+  separate("Task_exp_electrode", into = c("Task_Exp", "Electrode"), sep = 2) %>%
+  separate("Electrode", into = c("delete", "delete1", "Electrode", "delete2"), sep = "_") %>%
+  select(-delete, -delete1, -delete2) %>%
+  separate("Task_Exp", into = c("Task", "Expression"), sep = 1)
+
+erp_erd <- full_join(erp_survey_tidy, erd, by = c("ID", "Electrode", "Task", "Expression"))
+
+#Add laterality and anterior/posterior variables
+erp_erd_data <- erp_erd %>%
+  mutate(Laterality = ifelse(Electrode == "C3" | Electrode == "P3" | Electrode == "F3", "L",
+                             ifelse(Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz", "M",
+                                    ifelse(Electrode == "C4" | Electrode == "P4" | Electrode == "F4", "R", "NA")))) %>%
+  mutate(Anterior_Posterior = ifelse(Electrode == "F3" | Electrode == "Fz" | Electrode == "F4", "F",
+                                     ifelse(Electrode == "C3" | Electrode == "Cz" | Electrode == "C4", "C",
+                                            ifelse(Electrode == "P3" | Electrode == "Pz" | Electrode == "P4", "P", "NA")))) %>%
+  rename(Mean = Mean_Amplitude) %>%
+  gather(Mean, Delta, Theta, Alpha, Beta, Gamma, key = "Amplitude_Type", value = "Amplitude")
+```
+
+
+```{r}
+## Filtered data sets
+#By frequency
+all_freq <- erp_erd_data %>%
+  filter(Electrode == "C3" | Electrode == "P3" | Electrode == "F3" | Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz" |
+           Electrode == "C4" | Electrode == "P4" | Electrode == "F4")
+
+
+
+alpha_theta <- erp_erd_data %>%
+  filter(Electrode == "C3" | Electrode == "P3" | Electrode == "F3" | Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz" |
+           Electrode == "C4" | Electrode == "P4" | Electrode == "F4") %>%
+  filter(Amplitude_Type == "Alpha" | Amplitude_Type == "Theta")
+
+
+
+alpha <- alpha_theta %>%
+  filter(Electrode == "C3" | Electrode == "P3" | Electrode == "F3" | Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz" |
+           Electrode == "C4" | Electrode == "P4" | Electrode == "F4") %>%
+  filter(Amplitude_Type == "Alpha")
+```
+
+```{r}
+#By Condition
+neu <- erp_erd_data %>%
+  filter(Task == "N") %>%
+  filter(Amplitude_Type == "Alpha" | Amplitude_Type == "Theta")
+
+ang <- erp_erd_data %>%
+  filter(Task == "A") %>%
+  filter(Amplitude_Type == "Alpha" | Amplitude_Type == "Theta")
+
+#Rare or frequent
+rare <- erp_erd_data %>%
+  filter(Expression == "A" | Expression == "N") %>%
+  filter(Amplitude_Type == "Alpha" | Amplitude_Type == "Theta")
+
+frequent <- erp_erd_data %>%
+  filter(Expression == "H") %>%
+  filter(Amplitude_Type == "Alpha" | Amplitude_Type == "Theta")
+```
+
+# Investigating $\alpha$ and $\theta$ event-related desynchronization
+
+## Preliminary Analyses Omitting Variables of Interest
+
+A model (1), below, with dummmy variables laterality (L), axis (A), frequency (F), task (T) and expression (E), where subscripts indicate when indicators equal 1 (middle, right, frontal, parietal, theta, neutral, neutral and happy, respectively), and where $\sum \alpha$, for sake of succinctness, denotes every possible interaction between all indicators in the model, was evaluated first, in order to determine if any interactions were presented prior to the addition of variables of interest.
+
+$$Y_{amplitude} = \beta_0 + \gamma_M L_M + \gamma_R L_R + \delta_A A_F + \delta_A A_P + \zeta\ F_{\theta} + \eta T_N + \kappa_N E_N + \kappa_H E_H + \sum \alpha + \epsilon$$
+
+Though a repeated measures ANOVA could, alternatively, have been conducted, as values for different conditions were evaluated separately, multivariate regression was also suitable, and as sign of the coefficient for LHA was of interest (see later analyses), multiple linear regression was chosen.
+
+```{r}
+#Check interactions
+erd_mod_intxn <- lm(Amplitude ~ Laterality * Anterior_Posterior * Amplitude_Type * Task * Expression, data = all_freq)
+
+pander(summary(erd_mod_intxn))
+```
+
+$\hat\gamma_M$ was found to be a significant predictor of variance in amplitude when all other variables were considered.  Therefore, laterality was a significant predictor of brain-wave amplitude in response to facial stimuli, prior to introduction of LHA or LHEA variables.  Specifically, amplitude was significantly increased in the middle - Pz, Cz, and Fz - electrodes, compared to left electrodes - P3, C3, and F3, when all other parameters were held constant ($\hat\gamma_M = 12.47$, $p < 0.05$).  Spatial map of the neuroelectrical signal, therefore, significantly differed depending on electrode position, which is to be expected.
+
+Because no significant interactions were found in the full model, and because including impertinent multiplicative functions needlessly tax the precision of the model, interactions were removed from the full model, producing the reduced model (2)
+
+$$Y_{amplitude} = \beta_0 + \gamma\ L_{M} + \gamma\ L_{R} + \delta\ A_{F} + \delta\ A_{P} + \zeta\ F_{\theta} + \eta\ T_{N} + \kappa\ E_{N} + \kappa\ E_{H} + \epsilon$$
+
+An analysis of variance (ANOVA) was performed between the two models to determine if the reduced model, sans interactions, was significantly different from the full model.
+
+```{r}
+#Remove interactions
+erd_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior + Amplitude_Type + Task + Expression, data = alpha_theta)
+pander(anova(erd_mod, erd_mod_intxn))
+```
+
+The ANOVA found that several interactions were significant, which, if omitted, would distort conclusions drawn from the model.  To determine which interactions should be included in the model, an ANOVA was performed against the nullity of all interactions in model.
+
+```{r}
+pander(anova(lm(Amplitude ~ Laterality * Anterior_Posterior * Amplitude_Type * Task * Expression, data = alpha_theta)))
+```
+
+Significant interactions were between frequency band (either $\theta$ or $\alpha$) and axis ($F = 35.11, p < 0.0001$), or frequency band and expression (angry, neutral, happy), with significant main effects of laterality ($F = 62.65, p < 0.0001$), axis ($F = 7.988, p < 0.0005$), and task ($F = 6.394, p < 0.05$).
+
+## Concerning LHA and LHEA
+
+Because experienced aggression is known to be highly related to committed aggression, it was thought that collinearity would likely interfere with results if a model included both scores of experienced aggression and committed aggression as an interaction.  To test this hypothesis, two models were built, one in which committed aggression was regressed on experienced aggression, and the other in which experienced aggression was regressed on committed aggression.  Both models are reasonable, as it could very well be that, as some have posited, and in accordance with the cycle of violence theory, that experienced aggression is highly predictive of later committed aggression; however, it may also be that those with violent tendencies may initiate more aggressive interactions (thereby resulting in a higher experienced aggression score).
+
+```{r}
+lhea_lha <- lm(LHA ~ LHEA, data = survey_tidy)
+pander(summary(lhea_lha))
+
+lha_lhea <- lm(LHEA ~ LHA, data = survey_tidy)
+pander(summary(lha_lhea))
+```
+
+In $Y_{LHA} = \beta_0 + \beta_{LHEA}$, both $\beta_0$ and $\beta_{LHEA}$ are highly significant, while in $Y_{LHEA} = \beta_0 + \beta_{LHA}$, $\beta_0$ in non-significant, indicating that likely there is no linear relationship between low LHA and LHEA.  To evaluate form of the predictors' relationship, LHA was plotted against LHEA.
+
+```{r}
+erp_erd_data %>%
+  filter(!duplicated(ID)) %>%
+  ggplot(aes(LHA, LHEA)) +
+  geom_point(color = "steelblue4", alpha = 0.5, size = 1.2) +
+  labs(title = "D I V E R G E N C E  I N  O B S E R V A T I O N S",
+       x = "LHA",
+       y = "LHEA") +
+   theme(plot.title = element_text(hjust = 0.5, size = 11, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"))
+```
+
+While transformation of the data would be necessary to meet the linearity assumption, collinearity of LHA and LHEA is, nevertheless, manifested; because both variables were of interest, homoscedasticity of each predictor in the full model was assessed visually.
+
+```{r}
+lha_lhea_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior * Amplitude_Type + Task + Expression * Amplitude_Type + LHA * Amplitude_Type + LHEA, data = alpha_theta)
+
+ggplot(lha_lhea_mod, aes(LHA, .resid)) +
+  geom_point(color = "lightsteelblue4", alpha = 0.2) +
+  geom_hline(yintercept = 0) +
+  geom_smooth(se = F, color = "gray60", size = 0.7) +
+    labs(title = "Evaluation of LHA predictor",
+      subtitle = "H E T E R O S C E D A S T I C I T Y",
+       x = "LHA",
+       y = "Residuals") +
+ theme(plot.title = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+       plot.subtitle = element_text(hjust = 0.5, size = 16, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"))
+```
+
+```{r}
+ggplot(lha_lhea_mod, aes(LHEA, .resid)) +
+  geom_point(color = "lightsteelblue4", alpha = 0.2) +
+  geom_hline(yintercept = 0) +
+  geom_smooth(se = F, color = "gray60", size = 0.7) +
+    labs(title = "Evaluation of LHEA predictor",
+      subtitle = "H E T E R O S C E D A S T I C I T Y",
+       x = "LHEA",
+       y = "Residuals") +
+ theme(plot.title = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+       plot.subtitle = element_text(hjust = 0.5, size = 16, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"))
+```
+
+Because the variables are discrete, and, in essence categorical, they appear in columns in the plots; however, no noticeable trends occur in tandem with an increase or decrease in LHEA or LHA.  Therefore, it was determine both variables were suitable for subsequent regression.
+
+## $\alpha$-ERD models with LHA/LHEA
+
+Based on analyses testing nullity of interactions, model (3), below, containing LHA score as a variable and significant interactions was constructed.  Interactions between laterality and all variables aside from axis and LHA were omitted.  This model was chosen for several reasons:  first, interactions between laterality and other variables were non-significant in the full model, or in the ANOVA of interactions (with the exception of axis).  Second, the model already divides the variance between a large number of variables.  Third, the interaction of laterality with variables aside from axis and LHA were not of interest in this study.
+
+$$Y_{amplitude} = \beta_0 + \gamma_M L_M + \gamma_R L_R + \delta_A A_F + \delta_A A_P + \zeta\ F_{\theta} + \eta T_N + \kappa_N E_N + \kappa_H E_H + \beta_{LHA} X_{LHA} + \sum \alpha + \epsilon$$
+It should be noted that though technically LHA is a discrete variable (it cannot take values between whole integers; see Appendix II, containing the LHA questionnaire), it was treated as a quantitative variable because particular levels were not of interest, and because the sign of the $\beta$ coefficient was of interest.  Moreover, an analysis treating LHA as discrete found all levels to be significant except for scores of 4, 10, 16, and 22.
+
+```{r}
+#LHA interactions
+lha_intxn_mod <- lm(Amplitude ~ Laterality * Anterior_Posterior + Task * Expression + LHA * Amplitude_Type + LHA * Expression + LHA * Laterality, data = alpha_theta)
+
+pander(summary(lha_intxn_mod))
+```
+
+LHA as a predictor of variance was highly significant ($\hat\beta_{LHA} = -0.491, p < 0.05$).  Moreover, no significant interactions between laterality and frequency were found, nor were any interactions between LHA and frequency found, as was originally predicted.  However, the significance of LHA in predicting amplitude was intriguing, and investigation of differences in responses to specific stimuli and under the specific circumstances was desired. 
+
+```{r}
+lha_alpha_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior + Task + Expression + LHA, data = alpha)
+
+pander(summary(lha_alpha_mod))
+```
+
+## Investigating conditions, expressions and frequencies separately
+
+Tables 1-2 contain the results pertaining to the two unique regressions for the neutral and angry tasks (respectively); tables 3-4 contain the results of two 
+
+```{r}
+#By condition or rare/frequent
+neu_alpha <- neu %>%
+  filter(Amplitude_Type == "Alpha")
+neu_alpha_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior + Expression + LHA, data = neu_alpha)
+pander(summary(neu_alpha_mod))
+
+frequent_alpha <- frequent %>%
+  filter(Amplitude_Type == "Alpha")
+frequent_alpha_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior + LHA, data = frequent_alpha)
+pander(summary(frequent_alpha_mod))
+```
+
+```{r}
+ggplot(neu_alpha, aes(LHA, Amplitude)) +
+  geom_point()
+```
+
+
+## Exploratory Analysis Concerning Those with High LHEA, and Low LHA
+
+```{r}
+erp_erd_data %>%
+  filter(!duplicated(ID)) %>%
+  ggplot(aes(LHA, LHEA)) +
+  geom_point(color = "steelblue4", alpha = 0.5, size = 1.2) +
+  labs(title = "D I V E R G E N C E  I N  O B S E R V A T I O N S",
+       x = "LHA",
+       y = "LHEA") +
+   theme(plot.title = element_text(hjust = 0.5, size = 11, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"))
+
+```
+
+```{r}
+#LHA on X axis
+alpha_theta %>%
+  filter(Task == "A") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  na.omit %>%
+ggplot(aes(LHA, Amplitude, color = Expression)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~Anterior_Posterior) +
+  labs(title = "A  N  G  R  Y  v.  H  A  P  P  Y",
+       y = expression(paste(alpha, " amplitude (in mVs)"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 17, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+
+alpha_theta %>%
+  filter(Task == "N" & Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  na.omit() %>%
+ggplot(aes(LHA, Amplitude, color = Expression)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~Anterior_Posterior) +
+  labs(title = "N  E  U  T  R  A  L  v.  H  A  P  P  Y",
+       y = expression(paste(alpha, " amplitude (in mVs)"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 17, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9))
+
+#LHEA on X axis
+alpha_theta %>%
+  filter(Task == "A") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  mutate(high_low_LHA = ifelse(LHA <= 12, "\u2264 12", "> 12")) %>%
+  filter(LHEA > 19) %>%
+  na.omit %>%
+ggplot(aes(LHEA, Amplitude, color = high_low_LHA)) +
+  geom_point(alpha = 0.5) +
+  facet_grid(Anterior_Posterior ~ Expression) +
+  scale_color_discrete(breaks = c("\u2264 12","> 12")) +
+  labs(title = "H  i  g  h   v.   l  o  w   L  H  A *",
+       caption = "* for LHEA > 19 (median)",
+       y = expression(paste(alpha, " amplitude (in mVs)")),
+       color = "LHA") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        plot.subtitle = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+
+alpha_theta %>%
+  filter(Task == "N") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  mutate(high_low_LHA = ifelse(LHA <= 12, "\u2264 12", "> 12")) %>%
+  filter(LHEA > 19) %>%
+  na.omit %>%
+ggplot(aes(LHEA, Amplitude, color = high_low_LHA)) +
+  geom_point(alpha = 0.5) +
+  facet_grid(Anterior_Posterior ~ Expression) +
+  scale_color_discrete(breaks = c("\u2264 12","> 12")) +
+  labs(title = "H  i  g  h   v.   l  o  w   L  H  A *",
+       caption = "* for LHEA > 19 (median)",
+       y = expression(paste(alpha, " amplitude (in mVs)")),
+       color = "LHA") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        plot.subtitle = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+```
+
+
+## General alpha
+
+```{r}
+library(car)
+alpha_cen <- alpha %>%
+  filter(Anterior_Posterior == "C")
+
+#FM
+alpha_mod_intxn <- lm(Amplitude ~ Laterality * Task * Expression * ID, data = alpha)
+pander(summary(alpha_mod_intxn))
+
+alpha_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior + Task + Expression + ID, data = alpha)
+pander(summary(alpha_mod))
+
+pander(anova(alpha_mod, alpha_mod_intxn))
+
+pander(anova(lm(Amplitude ~ Laterality * Anterior_Posterior * Task * Expression, data = alpha)))
+
+#LHA interactions/no interactions
+lha_alpha_intx_mod <- lm(Amplitude ~ Laterality * LHA + Task + Expression + LHA, data = alpha)
+pander(summary(lha_alpha_intx_mod))
+
+lha_alpha_ID_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior + Task + Expression + LHA + ID, data = alpha)
+pander(summary(lha_alpha_ID_mod))
+
+lha_alpha_mod <- lm(Amplitude ~ Laterality + Anterior_Posterior + Task + Expression + LHA, data = alpha)
+pander(summary(lha_alpha_mod))
+
+d_alpha_lha <- durbinWatsonTest(lha_alpha_mod)
+pander(d_alpha_lha)
+
+alpha_resids <- alpha %>%
+  add_residuals(lha_alpha_mod)
+
+ggplot(alpha_resids, aes(ID, resid, color = IED)) +
+  geom_point(alpha = 0.2, size = 1) +
+  labs(title = "Evaluating the dataset's",
+       subtitle = "I N D E P E N D E N C E  O F  E R R O R S",
+       x = "ID",
+       y = "Residuals") +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+          plot.subtitle = element_text(hjust = 0.5, size = 14, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_blank())
+```
+
+```{r}
+ang_alpha <- ang %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  filter(Expression == "A") %>%
+  filter(Anterior_Posterior == "P")
+ang_alpha_mod <- lm(Amplitude ~ LHA, data = ang_alpha)
+pander(summary(ang_alpha_mod))
+
+rare_alpha <- rare %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  filter(Anterior_Posterior == "P")
+rare_alpha_mod <- lm(Amplitude ~ Expression + LHA, data = rare_alpha)
+pander(summary(rare_alpha_mod))
+```
+
+
+```{r}
+alpha_resids <- alpha %>%
+  add_residuals(lha_alpha_mod)
+
+ggplot(alpha_resids, aes(ID, resid, color = IED)) +
+  geom_point(alpha = 0.2, size = 1) +
+  labs(title = "Evaluating the dataset's",
+       subtitle = "I N D E P E N D E N C E  O F  E R R O R S",
+       x = "ID",
+       y = "Residuals") +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+          plot.subtitle = element_text(hjust = 0.5, size = 14, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_blank())
+```
+
+
+```{r}
+lha_lhea_cz_ang <- erp_erd_data %>%
+  mutate(LHA_level = ifelse(LHA <= 12, "low", "high"),
+         LHEA_level = ifelse(LHEA <= 19, "low", "high")) %>%
+  unite(LHA_LHEA, LHA_level, LHEA_level) %>%
+  mutate(LHA_LHEA = factor (LHA_LHEA)) %>%
+  filter(LHA_LHEA == "high_high" | LHA_LHEA == "low_high") %>%
+  filter(Amplitude_Type == "Alpha" & Expression == "A" & Anterior_Posterior == "F")
+
+lhea_lha_cz_ang_mod <- lm(Amplitude ~ LHA_LHEA, data = lha_lhea_cz_ang)
+
+pander(summary(lhea_lha_cz_ang_mod))
+
+cz_resids <- lha_lhea_cz_ang %>%
+  add_residuals(lhea_lha_cz_ang_mod)
+
+ggplot(cz_resids, aes(ID, resid, color = IED)) +
+  geom_point(size = 1) +
+  labs(title = "Evaluating the dataset's",
+       subtitle = "I N D E P E N D E N C E  O F  E R R O R S",
+       x = "ID",
+       y = "Residuals") +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+          plot.subtitle = element_text(hjust = 0.5, size = 14, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+```
+
+
+```{r}
+erd_lha_lhea_pz <- erp_erd_data %>%
+  mutate(LHA_level = ifelse(LHA <= 12, "low", "high"),
+         LHEA_level = ifelse(LHEA <= 19, "low", "high")) %>%
+  unite(LHA_LHEA, LHA_level, LHEA_level) %>%
+  mutate(LHA_LHEA = factor (LHA_LHEA)) %>%
+  filter(LHA_LHEA == "high_high" | LHA_LHEA == "low_high") %>%
+  filter(Amplitude_Type == "Alpha" & Electrode == "Pz" & Expression == "A")
+
+pander(summary(lm(Amplitude ~ LHA_LHEA, data = erd_lha_lhea_pz)))
+
+erd_lha_lhea_fz <- erp_erd_data %>%
+  mutate(LHA_level = ifelse(LHA <= 12, "low", "high"),
+         LHEA_level = ifelse(LHEA <= 19, "low", "high")) %>%
+  unite(LHA_LHEA, LHA_level, LHEA_level) %>%
+  mutate(LHA_LHEA = factor (LHA_LHEA)) %>%
+  filter(LHA_LHEA == "high_high" | LHA_LHEA == "low_high") %>%
+  filter(Amplitude_Type == "Alpha" & Electrode == "Fz" & Expression == "A")
+
+pander(summary(lm(Amplitude ~ LHA_LHEA, data = erd_lha_lhea_fz)))
+
+erd_lha_lhea_cz <- erp_erd_data %>%
+  mutate(LHA_level = ifelse(LHA <= 12, "low", "high"),
+         LHEA_level = ifelse(LHEA <= 19, "low", "high")) %>%
+  unite(LHA_LHEA, LHA_level, LHEA_level) %>%
+  mutate(LHA_LHEA = factor (LHA_LHEA)) %>%
+  filter(LHA_LHEA == "high_high" | LHA_LHEA == "low_high") %>%
+  filter(Amplitude_Type == "Alpha" & Electrode == "Cz" & Expression == "A")
+
+pander(summary(lm(Amplitude ~ LHA_LHEA, data = erd_lha_lhea_cz)))
+```
+
+```{r}
+#library(afex)
+
+#erp_erd_no_na <- erp_erd_data %>%
+  #na.omit()
+
+#e_aov <- aov_ez("ID", "Amplitude", erp_erd_data,
+                #between = c("LHA", "LHEA", "Sex"),
+                #within = c("Amplitude_Type", "Task", "Expression", "Laterality", "Anterior_Posterior"),
+               #anova_table = list(es = "pes"))
+#print(e_aov)
+```
+
+
