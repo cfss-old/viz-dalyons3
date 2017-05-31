@@ -22,12 +22,43 @@ Background, Methods & Techniques
 
 Lower alpha-amplitude, recently, has been correlated with high aggression.  This lower alpha-amplitude, generally, is correlated with recruitment of lesser cognitive resources in response to a stimulus.  In athletes, this "alpha burst" has been found to be helpful in reducing cognitive activity and increasing motor activity just prior to execution of a well-rehearsed movement, with optimal performance occurring following lowest alpha amplitude.  This study sought, first, to replicate findings that aggressive individuals exhibit lower alpha in response to angry stimuli, and second, sought explore differences between individuals who had low committed aggression, but high experienced aggression, and individuals who had both high committed and experienced aggression.
 
-Stripchart of Expressions in the Angry Task
-========================================================
-
 ```
 {r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+erp_erd <- read_csv("ERP_ERD.csv")
+```
+
+Stripchart of Expressions in the Angry Task
+========================================================
+
+![plot of chunk unnamed-chunk-8](Final_project-figure/unnamed-chunk-2-1.png)
+
+```{r}
+Cz_Fz_Pz <- erp_erd %>%
+  filter(Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz")
+
+Cz_Fz_Pz %>%
+  filter(Task == "A") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+ggplot(aes(Electrode, Mean_Amplitude, color = LHA)) +
+  geom_jitter(position=position_jitter(0.2), alpha = 0.5) +
+  stat_summary(fun.y=median, geom="bar", fill ="darkgray", size = 1, alpha = 0.2) + 
+  labs(title = "T H E  P 3  C O M P O N E N T",
+       subtitle = "following expressions in the angry task",
+       y = "Amplitude (in milliVolts)") +
+  facet_wrap(~Expression) +
+  theme(plot.title = element_text(family = "Times", face = "italic", hjust = 0.5),
+        plot.subtitle = element_text(family = "Times", face = "italic", hjust = 0.5),
+        axis.title = element_text(family = "Times", face = "italic"),
+        axis.text = element_text(family = "Times", face = "italic"),
+        plot.caption = element_text(family = "Times", size = 8),
+        strip.text.x = element_text(family = "Times", face = "italic"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", face = "italic", size = 8))
 ```
 
 
@@ -35,6 +66,26 @@ Stripchart of Expressions in the Neutral Task
 ========================================================
 
 ![plot of chunk unnamed-chunk-3](Final_project-figure/unnamed-chunk-3-1.png)
+
+
+```{r}
+Cz_Fz_Pz %>%
+  filter(Task == "A") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  ggplot(aes(Electrode, Mean_Amplitude, color = LHA)) +
+  geom_jitter(position=position_jitter(0.2), alpha = 0.5, color = "steelblue3") +
+  stat_summary(fun.y=median, geom="bar", fill ="darkgray", size = 1, alpha = 0.2) + 
+  labs(title = "T H E  P 3  C O M P O N E N T",
+       subtitle = "following expressions in the neutral task",
+       y = "Amplitude (in milliVolts)") +
+  facet_wrap(~Expression) +
+  theme(plot.title = element_text(family = "Times", face = "italic", hjust = 0.5),
+        plot.subtitle = element_text(family = "Times", face = "italic", hjust = 0.5),
+        axis.title = element_text(family = "Times", face = "italic"),
+        axis.text = element_text(family = "Times", face = "italic"),
+        strip.text.x = element_text(family = "Times", face = "italic"))
+```
+
 
 Cairo's 5 Qualities of Great Visualizations
 ========================================================
@@ -52,6 +103,28 @@ Race Boxplot for P3 in Angry Task
 
 ![plot of chunk unnamed-chunk-4](Final_project-figure/unnamed-chunk-4-1.png)
 
+```{r}
+Cz_Fz_Pz %>%
+  filter(Task == "N") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Race = ifelse(Race == 1, "Caucasian",
+                       ifelse(Race == 2, "African American",
+                              ifelse(Race == 3, "Asian/Pacific Rim", "Hispanic")))) %>%
+ggplot(aes(Electrode, Mean_Amplitude)) +
+  geom_boxplot(aes(color = Race, fill = Race), alpha = 0.5) +
+  labs(title = "T H E  P 3  C O M P O N E N T",
+       subtitle = "following expressions in the angry task",
+       y = "Amplitude (in milliVolts)") +
+  facet_wrap(~Expression) +
+  theme(plot.title = element_text(family = "Times", face = "italic", hjust = 0.5),
+        plot.subtitle = element_text(family = "Times", face = "italic", hjust = 0.5),
+        axis.title = element_text(family = "Times", face = "italic"),
+        axis.text = element_text(family = "Times", face = "italic"),
+        strip.text.x = element_text(family = "Times", face = "italic"),
+        legend.position = "bottom",
+        legend.title = element_blank())
+```
+
 Cairo's Qualities
 ========================================================
 *Truthful & Functional*  
@@ -68,10 +141,83 @@ Comparing Responses as a Function of Aggression
 
 ![plot of chunk unnamed-chunk-5](Final_project-figure/unnamed-chunk-5-1.png)
 
+```{r}
+erp_erd_data <- erp_erd %>%
+  mutate(Laterality = ifelse(Electrode == "C3" | Electrode == "P3" | Electrode == "F3", "L",
+                             ifelse(Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz", "M",
+                                    ifelse(Electrode == "C4" | Electrode == "P4" | Electrode == "F4", "R", "NA")))) %>%
+  mutate(Anterior_Posterior = ifelse(Electrode == "F3" | Electrode == "Fz" | Electrode == "F4", "F",
+                                     ifelse(Electrode == "C3" | Electrode == "Cz" | Electrode == "C4", "C",
+                                            ifelse(Electrode == "P3" | Electrode == "Pz" | Electrode == "P4", "P", "NA")))) %>%
+  rename(Mean = Mean_Amplitude) %>%
+  gather(Mean, Delta, Theta, Alpha, Beta, Gamma, key = "Amplitude_Type", value = "Amplitude")
+
+alpha_theta <- erp_erd_data %>%
+  filter(Electrode == "C3" | Electrode == "P3" | Electrode == "F3" | Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz" |
+           Electrode == "C4" | Electrode == "P4" | Electrode == "F4") %>%
+  filter(Amplitude_Type == "Alpha" | Amplitude_Type == "Theta")
+
+alpha_theta %>%
+  filter(Task == "A") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  na.omit %>%
+ggplot(aes(LHA, Amplitude, color = Expression)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~Anterior_Posterior) +
+  labs(title = "A  N  G  R  Y  v.  H  A  P  P  Y",
+       y = expression(paste(alpha, " amplitude (in mVs)"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 17, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+```
+
 Comparing Responses as a Function of Aggression
 ========================================================
 
 ![plot of chunk unnamed-chunk-6](Final_project-figure/unnamed-chunk-6-1.png)
+
+```{r}
+alpha_theta %>%
+  filter(Task == "N" & Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  na.omit() %>%
+ggplot(aes(LHA, Amplitude, color = Expression)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~Anterior_Posterior) +
+  labs(title = "N  E  U  T  R  A  L  v.  H  A  P  P  Y",
+       y = expression(paste(alpha, " amplitude (in mVs)"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 17, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9))
+```
 
 Cairo's Qualities
 ========================================================
@@ -89,10 +235,84 @@ Comparing Responses of Groups
 
 ![plot of chunk unnamed-chunk-7](Final_project-figure/unnamed-chunk-7-1.png)
 
+```{r}
+alpha_theta %>%
+  filter(Task == "A") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  mutate(high_low_LHA = ifelse(LHA <= 12, "\u2264 12", "> 12")) %>%
+  filter(LHEA > 19) %>%
+  na.omit %>%
+ggplot(aes(LHEA, Amplitude, color = high_low_LHA)) +
+  geom_point(alpha = 0.5) +
+  facet_grid(Anterior_Posterior ~ Expression) +
+  scale_color_discrete(breaks = c("\u2264 12","> 12")) +
+  labs(title = "H  i  g  h   v.   l  o  w   L  H  A *",
+       caption = "* for LHEA > 19 (median)",
+       y = expression(paste(alpha, " amplitude (in mVs)")),
+       color = "LHA") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        plot.subtitle = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+```
+
 Comparing Responses of Groups
 ========================================================
 
 ![plot of chunk unnamed-chunk-8](Final_project-figure/unnamed-chunk-8-1.png)
+
+```{r}
+
+alpha_theta %>%
+  filter(Task == "N") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  mutate(high_low_LHA = ifelse(LHA <= 12, "\u2264 12", "> 12")) %>%
+  filter(LHEA > 19) %>%
+  na.omit %>%
+ggplot(aes(LHEA, Amplitude, color = high_low_LHA)) +
+  geom_point(alpha = 0.5) +
+  facet_grid(Anterior_Posterior ~ Expression) +
+  scale_color_discrete(breaks = c("\u2264 12","> 12")) +
+  labs(title = "H  i  g  h   v.   l  o  w   L  H  A *",
+       caption = "* for LHEA > 19 (median)",
+       y = expression(paste(alpha, " amplitude (in mVs)")),
+       color = "LHA") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        plot.subtitle = element_text(hjust = 0.5, size = 12, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+```
+
 
 Cairo's Qualities
 ========================================================
