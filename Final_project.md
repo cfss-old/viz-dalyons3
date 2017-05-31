@@ -35,7 +35,7 @@ erp_erd <- read_csv("ERP_ERD.csv")
 Stripchart of Expressions in the Angry Task
 ========================================================
 
-![plot of chunk unnamed-chunk-8](Final_project-figure/unnamed-chunk-2-1.png)
+![plot of chunk unnamed-chunk-8](unnamed-chunk-2-1.png)
 
 ```{r}
 Cz_Fz_Pz <- erp_erd %>%
@@ -65,7 +65,7 @@ ggplot(aes(Electrode, Mean_Amplitude, color = LHA)) +
 Stripchart of Expressions in the Neutral Task
 ========================================================
 
-![plot of chunk unnamed-chunk-3](Final_project-figure/unnamed-chunk-3-1.png)
+![plot of chunk unnamed-chunk-3](unnamed-chunk-3-1.png)
 
 
 ```{r}
@@ -101,7 +101,7 @@ Using color to encode LHA, it's possible to see that there is really no pattern 
 Race Boxplot for P3 in Angry Task
 ========================================================
 
-![plot of chunk unnamed-chunk-4](Final_project-figure/unnamed-chunk-4-1.png)
+![plot of chunk unnamed-chunk-4](unnamed-chunk-4-1.png)
 
 ```{r}
 Cz_Fz_Pz %>%
@@ -139,7 +139,7 @@ Again, the insights gleaned via this visualization were highly useful - not only
 Comparing Responses as a Function of Aggression
 ========================================================
 
-![plot of chunk unnamed-chunk-5](Final_project-figure/unnamed-chunk-5-1.png)
+![plot of chunk unnamed-chunk-5](unnamed-chunk-5-1.png)
 
 ```{r}
 erp_erd_data <- erp_erd %>%
@@ -189,7 +189,7 @@ ggplot(aes(LHA, Amplitude, color = Expression)) +
 Comparing Responses as a Function of Aggression
 ========================================================
 
-![plot of chunk unnamed-chunk-6](Final_project-figure/unnamed-chunk-6-1.png)
+![plot of chunk unnamed-chunk-6](unnamed-chunk-6-1.png)
 
 ```{r}
 alpha_theta %>%
@@ -233,7 +233,7 @@ We chose to include trend lines because their close proximity is enlightening - 
 Comparing Responses of Groups
 ========================================================
 
-![plot of chunk unnamed-chunk-7](Final_project-figure/unnamed-chunk-7-1.png)
+![plot of chunk unnamed-chunk-7](unnamed-chunk-7-1.png)
 
 ```{r}
 alpha_theta %>%
@@ -274,7 +274,7 @@ ggplot(aes(LHEA, Amplitude, color = high_low_LHA)) +
 Comparing Responses of Groups
 ========================================================
 
-![plot of chunk unnamed-chunk-8](Final_project-figure/unnamed-chunk-8-1.png)
+![plot of chunk unnamed-chunk-8](unnamed-chunk-8-1.png)
 
 ```{r}
 
