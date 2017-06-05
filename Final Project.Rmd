@@ -1,0 +1,353 @@
+---
+title: "Discussion of Techniques Used to Visualize EEG Data in a Master's Research Thesis"
+author: "Nicole Sullivan & Don Lyons"
+date: "5/31/2017"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+erp_erd <- read_csv("ERP_ERD.csv")
+```
+
+# Introduction
+
+## Background
+
+Lower mean P3 amplitude and lower alpha-amplitude, recently, have been correlated with high aggression.  This decrease in amplitude in the P3 component and alpha frequency band, generally, is correlated with recruitment of lesser cognitive resources in response to a stimulus.  In athletes, an "alpha burst" has been found to be helpful in reducing cognitive activity and increasing motor activity just prior to execution of a well-rehearsed movement, with optimal performance occurring following lowest alpha amplitude.  This study sought, first, to replicate findings that aggressive individuals exhibit lower P3 and alpha amplitudes in response to angry stimuli, and second, sought explore differences between individuals who had low committed aggression, but high experienced aggression, and individuals who had both high committed and experienced aggression.  
+
+## Applied Question & Measurements 
+  
+Why are some individuals resilient in the face of experienced aggression, while others develop high aggression?  How do highly aggressive indviduals differ neurophysiologically from those with low committed aggression, when experienced aggression is controlled?  To answer these questions, EEG was used to collect quantitative data on amplitude of brainwaves in different conditions.  To obtain frequency, data were decomposed using the FFT method via the Brain Electrical Source Analysis (BESA) software.  Aggression was rated via the Lifetime History of Aggression (LHA) and Lifetime History of Experienced Aggression (LHEA) questionnaires.  Questionnaires were self-administered.
+  
+# Visualization Methods
+
+R was used exclusively for visualization.  Data and source code for all visualizations are publicly available in this GitHub repository.  Approach utilized for visualization followed principles outlined in Alberto Cairo's *Truthful Art*, attempting to maximize truthfulness, functionality, beauty, insightfulness, and enlightening capability of each plot, while highlighting answers to the aforementioned research questions.  Rationale specific to each plot follows.
+
+# Discussion
+
+## Stripcharts of Expressions in Angry and Neutral Tasks
+
+```{r}
+strip_theme <- theme(plot.title = element_text(family = "Times", face = "italic", hjust = 0.5, color = "gray45"),
+        plot.subtitle = element_text(family = "Times", face = "italic", hjust = 0.5, color = "gray45"),
+        axis.title = element_text(family = "Times", face = "italic", color = "gray45"),
+        axis.text = element_text(family = "Times", face = "italic", color = "gray45"),
+        strip.text.x = element_text(family = "Times", face = "italic", color = "gray45"),
+        strip.background = element_blank(),
+        legend.title = element_text(family = "Times", face = "italic", size = 8, color = "gray45"),
+        legend.text = element_text(family = "Times", color = "gray45", size = 8))
+
+Cz_Fz_Pz <- erp_erd %>%
+  filter(Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz") %>%
+  mutate(LHA = ifelse(LHA == "NaN", 0, LHA)) %>%
+  mutate(LHA_levels = ifelse(LHA == 0, "0 - 5",
+                             ifelse(LHA == 1, "0 - 5",
+                                    ifelse(LHA == 2, "0 - 5",
+                                           ifelse(LHA == 3, "0 - 5",
+                                                  ifelse(LHA == 4, "0 - 5",
+                                                         ifelse(LHA == 5, "0 - 5",
+                                                                ifelse(LHA == 6, "6 - 10",
+                                                                       ifelse(LHA == 7, "6 - 10",
+                                                                              ifelse(LHA == 8, "6 -10",
+                                                                                     ifelse(LHA == 9, "6 - 10",
+                                                                                            ifelse(LHA == 10, "6 - 10",
+                                                                                                   ifelse(LHA == 11, "11 - 15",
+                                                                                                          ifelse(LHA == 12, "11 - 15",
+                                                                                                                 ifelse(LHA == 13, "11 - 15",
+                                                                                                                        ifelse (LHA == 14, "11 - 15",
+                                                                                                                                ifelse(LHA == 15, "11 - 15",
+                                                                                                                                       ifelse(LHA == 16, "16 - 20",
+                                                                                                                                              ifelse(LHA == 17, "16 - 20",
+                                                                                                                                                     ifelse(LHA == 18, "16 - 20",
+                                                                                                                                                            ifelse(LHA == 19, "16 - 20",
+                                                                                                                                                                   ifelse(LHA == 20, "16 - 20", "21 - 25")))))))))))))))))))))) %>%
+  na.omit()
+
+Cz_Fz_Pz %>%
+  filter(Task == "A") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+ggplot(aes(Electrode, Mean_Amplitude)) +
+  geom_jitter(position=position_jitter(0.2), alpha = 0.7, aes(color = LHA_levels), size = 2) +
+  stat_summary(fun.y=median, geom="bar", fill ="darkgray", size = 1, alpha = 0.2) +
+  scale_color_manual(breaks = c("0 - 5", "6 - 10", "11 - 15", "16 - 20", "21 - 25"), values = c("0 - 5" = "#7fcdbb", "6 - 10" = "#41b6c4", "11 - 15" = "#1d91c0", "16 - 20" = "#225ea8", "21 - 25" = "#081d58")) +
+  labs(title = "T H E  P 3  C O M P O N E N T",
+       subtitle = "following expressions in the angry task",
+       color = "LHA score",
+       y = "Mean Amplitude (in milliVolts)") +
+  facet_wrap(~Expression) +
+  strip_theme
+```
+
+```{r}
+Cz_Fz_Pz %>%
+  filter(Task == "N") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+ggplot(aes(Electrode, Mean_Amplitude)) +
+  geom_jitter(position=position_jitter(0.2), alpha = 0.7, aes(color = LHA_levels), size = 2) +
+  stat_summary(fun.y=median, geom="bar", fill ="darkgray", size = 1, alpha = 0.2) +
+  scale_color_manual(breaks = c("0 - 5", "6 - 10", "11 - 15", "16 - 20", "21 - 25"), values = c("0 - 5" = "#7fcdbb", "6 - 10" = "#41b6c4", "11 - 15" = "#1d91c0", "16 - 20" = "#225ea8", "21 - 25" = "#081d58")) +
+  labs(title = "T H E  P 3  C O M P O N E N T",
+       subtitle = "following expressions in the neutral task",
+       color = "LHA score",
+       y = "Mean Amplitude (in milliVolts)") +
+  facet_wrap(~Expression) +
+  strip_theme
+
+```
+
+*Truthfulness*  
+We chose a stripchart because we wanted to preserve the amplitude for each individual and then map LHA score onto points using the color channel.  Each electrode was given a separate column because this is generally the most truthful way of conveying EEG data (vs. a cortical average which could be seen as data manipulation).  
+  
+*Functionality*  
+We used a stripchart to ensure that the key perceptual task was determining position along a common scales. Cleveland and McGill claim that this task is elementary to meaningful perception. Additionally, grouping in the plot as coded by color was utilized to allow for a third dimension of data that assists the reader in understanding the overall point of the visualization.  Groups were broken into discrete groups and colored using suggestions from Colorbrewer2.org to emphasize the lack of coherent pattern based on LHA (i.e. no statistically significant differences in P3 amplitude as a function of LHA score).  We also enlarged points to facilitate rapid comparison and mental summarizing of data.  While the strip background behind each facet's title was removed as it was extraneous functionally and aesthetically, grey paneling was used to distinguish one facet from another.  Without paneling, it was not immediately apparent which comparisons should be made and why each electrode was duplicated.
+  
+*Beauty*  
+We chose jittering and transparency as further aesthetics for the points because we felt it a beautiful way of conveying the data truthfully; we also felt that adding a novel type of visualization (rather than merely using a boxplot, which had already been used and is somewhat standard in the scientific field) expressed the data in a lovely way.  Wide kerning was utilized in the title to draw attention to the simple overall theme of the graph and draw the eye to the top of the graph and consequently down.  
+  
+*Insightfulness & Ability to Enlighten*  
+Using color to encode LHA, it's possible to see that there is really no pattern with increasing aggression - those with both low and high LHA scores are scattered across all amplitudes.  By using a spectrum of color in this way, we advance the intended conclusion that LHA score does not significantly correlate linearly with P3 amplitude.
+
+## Race Boxplot for P3 in Angry Task
+
+```{r}
+Cz_Fz_Pz %>%
+  filter(Task == "N") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Race = ifelse(Race == 1, "Caucasian",
+                       ifelse(Race == 2, "African American",
+                              ifelse(Race == 3, "Asian/Pacific Rim", "Hispanic")))) %>%
+ggplot(aes(Electrode, Mean_Amplitude)) +
+  geom_boxplot(aes(color = Race, fill = Race), alpha = 0.5, width = 0.5) +
+  labs(title = "T H E  P 3  C O M P O N E N T",
+       subtitle = "following expressions in the angry task",
+       y = "Amplitude (in milliVolts)") +
+  facet_wrap(~Expression) +
+theme(plot.title = element_text(family = "Times", face = "italic", hjust = 0.5, color = "gray40"),
+        plot.subtitle = element_text(family = "Times", face = "italic", hjust = 0.5, color = "gray35"),
+        axis.title = element_text(family = "Times", face = "italic", color = "gray45"),
+        axis.text = element_text(family = "Times", face = "italic", color = "gray45"),
+        strip.text.x = element_text(family = "Times", face = "italic", color = "gray45"),
+        strip.background = element_blank(),
+      legend.position = "bottom",
+        legend.title = element_text(family = "Times", face = "italic", size = 8, color = "gray45"),
+        legend.text = element_text(family = "Times", color = "gray45", size = 8))
+```
+
+*Truthfulness*  
+When analysis returned several significant interactions for race, we wondered if the P3 component also differed as a function of race.  However, via visualization, we were able to determine that this result was due to the responses of the Asian/Pacific Rim group, which had only two subjects.  This visualization, then, was arguably a more truthful representation of the data than the statistical analysis was.  
+  
+*Functionality*  
+While Cleveland and McGill generally don’t encourage the use of length as a channel for information due to the elementary effectiveness of position on a common scale, that lesser usefulness of length strengthens the contrast between races. The observer notes that it is the Asian/Pacific Rim group’s position that accounts for the significant difference, as opposed to the less compelling differences between box length across the other races.
+  
+*Beauty*  
+We chose color because we found it a highly attractive way to distinguish each race from another. We purposefully chose to encode the race channel by the three primary colors and purple, as the three primary colors of red, green, and blue allow for unambiguous contrast and group assignment. While purple is not a primary color, it allowed the use of a distinct color channel that remained both visible and beautiful. Again, kerning was utilized to present the title in a welcoming way that encourages one to read the caption below.   
+  
+*Insightfulness & Ability to Enlighten*  
+Again, the insights gleaned via this visualization were highly useful - not only did they deter us from drawing improper conclusions (that neurophysiological responses differ as a function of race), but they enlightened us:  quite interestingly, it appears that all races have similar P3 amplitude in response to different facial stimuli.
+
+## Comparing Responses as a Function of Aggression
+
+```{r}
+erp_erd_data <- erp_erd %>%
+  mutate(Laterality = ifelse(Electrode == "C3" | Electrode == "P3" | Electrode == "F3", "L",
+                             ifelse(Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz", "M",
+                                    ifelse(Electrode == "C4" | Electrode == "P4" | Electrode == "F4", "R", "NA")))) %>%
+  mutate(Anterior_Posterior = ifelse(Electrode == "F3" | Electrode == "Fz" | Electrode == "F4", "F",
+                                     ifelse(Electrode == "C3" | Electrode == "Cz" | Electrode == "C4", "C",
+                                            ifelse(Electrode == "P3" | Electrode == "Pz" | Electrode == "P4", "P", "NA")))) %>%
+  rename(Mean = Mean_Amplitude) %>%
+  gather(Mean, Delta, Theta, Alpha, Beta, Gamma, key = "Amplitude_Type", value = "Amplitude")
+
+alpha_theta <- erp_erd_data %>%
+  filter(Electrode == "C3" | Electrode == "P3" | Electrode == "F3" | Electrode == "Cz" | Electrode == "Pz" | Electrode == "Fz" |
+           Electrode == "C4" | Electrode == "P4" | Electrode == "F4") %>%
+  filter(Amplitude_Type == "Alpha" | Amplitude_Type == "Theta")
+
+alpha_theta %>%
+  filter(Task == "A") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  na.omit %>%
+ggplot(aes(LHA, Amplitude, color = Expression)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~Anterior_Posterior) +
+  labs(title = "A  N  G  R  Y  v.  H  A  P  P  Y",
+       y = expression(paste(alpha, " amplitude (in mVs)"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 17, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        strip.text.x = element_text(family = "Times", face = "italic", color = "gray45"),
+        strip.background = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+```
+
+```{r}
+alpha_theta %>%
+  filter(Task == "N" & Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  na.omit() %>%
+ggplot(aes(LHA, Amplitude, color = Expression)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~Anterior_Posterior) +
+  labs(title = "N  E  U  T  R  A  L  v.  H  A  P  P  Y",
+       y = expression(paste(alpha, " amplitude (in mVs)"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 17, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(family = "Times", color = "gray50", face = "italic"),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"))
+```
+
+*Truthfulness & Functionality*  
+We chose to use the contrasting primary colors of red and blue to encode expression so that expressions would appear on the same graph and would be easier to compare to one another.  In this case, infrequent neutral stimuli were jittered with frequent happy stimuli for the purposes of the P3 analysis; hence, we were interested if responses appeared to be significantly different in the frequency condition based on expression.  Again, position on a common scale was used as it is the most elementary and direct perceptual channel.  
+  
+*Beauty*  
+We used the built-in ggplot colors to distinguish between the two different expressions because we felt that, as primary colors and colors that are farthest apart from one another on the color wheel, the red and blue contrast nicely.  We greyed fonts to bring out the color of the points, and to complement the palette more closely.  We also changed most of the fonts to serif as these are generally easier to read and used more often for scientific audiences.  
+  
+*Insightfulness & Ability to Enlighten*  
+We chose to include trend lines because their close proximity is enlightening - it shows that responses to the two different expressions don't differ significantly - furthermore, despite a spike in the middle (which is easier to see is caused by one or two individuals with especially high amplitude alpha), the line is mainly flat, indicating that low aggressives and high aggressives don't exhibit significant differences in alpha amplitude in response to either neutral or happy faces.  The use of this functionality reflects the influence of Bateman’s work on visual embellishment, as we believe that meaningful embellishment will enhance a viewer’s longterm recall of the takeaways.
+
+# Comparing Group Responses Using Bar Charts
+
+```{r}
+library(plyr)
+bar_chart_ang <- alpha_theta %>%
+  filter(Task == "A") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "A", "Angry", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  mutate(high_low_LHA = ifelse(LHA <= 12, "\u2264 12", "> 12")) %>%
+  filter(LHEA > 19) %>%
+  na.omit %>%
+  unite(Task_Exp_Axis_Group, Task, Expression, Anterior_Posterior, high_low_LHA)
+
+avg_sd_ang <- plyr::ddply(bar_chart_ang, .(Task_Exp_Axis_Group), summarize, mean_amp = mean(Amplitude), sd_amp = sd(Amplitude))
+
+bars_ang <- avg_sd_ang %>%
+  separate(Task_Exp_Axis_Group, into = c("Task", "Expression", "Anterior_Posterior", "high_low_LHA"), sep = "_") %>%
+  mutate(se_amp = sd_amp/sqrt(49)) %>%
+  mutate(ymax = mean_amp + se_amp,
+         ymin = mean_amp - se_amp)
+  
+
+ggplot(bars_ang, aes(high_low_LHA, mean_amp)) +
+  geom_bar(stat = "identity", fill = "lightsteelblue4", alpha = 0.6, width = 0.2) +
+  geom_errorbar(aes(ymin = mean_amp - se_amp, ymax = mean_amp + se_amp), width = 0.1, color = "gray40") +
+  facet_grid(Anterior_Posterior ~ Expression) +
+  scale_color_discrete(breaks = c("\u2264 12","> 12")) +
+  labs(subtitle = "for individuals with high experienced aggression, but differing committed aggression*",
+       title = "Alpha-Amplitude following Expressions in the Angry Task",
+       caption = "* for LHEA > 19 (median)",
+       x = "LHA Score",
+       y = expression(paste(alpha, " amplitude (in mVs)")),
+       color = "LHA") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        plot.subtitle = element_text(hjust = 0.5, size = 10, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"),
+        strip.background = element_blank(),
+        strip.text = element_text(family = "Times", color = "gray50", face = "italic"))
+```
+
+```{r}
+bar_chart_neu <- alpha_theta %>%
+  filter(Task == "N") %>%
+  filter(Amplitude_Type == "Alpha") %>%
+  mutate(Expression = ifelse(Expression == "N", "Neutral", "Happy")) %>%
+  mutate(Anterior_Posterior = ifelse(Anterior_Posterior == "C", "C3, Cz & C4",
+                                     ifelse(Anterior_Posterior == "F", "F3, Fz & F4", "P3, Pz & P4"))) %>%
+  mutate(high_low_LHA = ifelse(LHA <= 12, "\u2264 12", "> 12")) %>%
+  filter(LHEA > 19) %>%
+  na.omit %>%
+  unite(Task_Exp_Axis_Group, Task, Expression, Anterior_Posterior, high_low_LHA)
+
+avg_sd_neu <- plyr::ddply(bar_chart_neu, .(Task_Exp_Axis_Group), summarize, mean_amp = mean(Amplitude), sd_amp = sd(Amplitude))
+
+bars_neu <- avg_sd_neu %>%
+  separate(Task_Exp_Axis_Group, into = c("Task", "Expression", "Anterior_Posterior", "high_low_LHA"), sep = "_") %>%
+  mutate(se_amp = sd_amp/sqrt(49)) %>%
+  mutate(ymax = mean_amp + se_amp,
+         ymin = mean_amp - se_amp)
+
+ggplot(bars_neu, aes(high_low_LHA, mean_amp)) +
+  geom_bar(stat = "identity", fill = "lightsteelblue4", alpha = 0.7, width = 0.2) +
+  facet_grid(Anterior_Posterior ~ Expression) +
+  scale_color_discrete(breaks = c("\u2264 12","> 12")) +
+   geom_errorbar(aes(ymin = mean_amp - se_amp, ymax = mean_amp + se_amp), width = 0.1, color = "gray40") +
+  labs(subtitle = "for individuals with high experienced aggression, but differing committed aggression*",
+       title = "Alpha-Amplitude following Expressions in the Neutral Task",
+       caption = "* for LHEA > 19 (median)",
+       x = "LHA score",
+       y = expression(paste(alpha, " amplitude (in mVs)")),
+       color = "LHA") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        plot.subtitle = element_text(hjust = 0.5, size = 10, face = "italic", 
+                                  family = "Times", color = "gray50"),
+        axis.title.x = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        axis.title.y = element_text(hjust = 0.5, size = 9, face = "italic", 
+                                    family = "Times", color = "gray50"),
+        plot.caption = element_text(size = 8, color = "gray50", family = "Times"),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(family = "Times", color = "gray50"),
+        axis.text.y = element_text(family = "Times", color = "gray50"),
+        axis.ticks = element_line(color = "gray50"),
+        legend.position = "bottom",
+        legend.title = element_text(family = "Times", color = "gray50", size = 9),
+        legend.text = element_text(family = "Times", color = "gray50", size = 9, face = "italic"),
+        strip.background = element_blank(),
+        strip.text = element_text(family = "Times", color = "gray50", face = "italic"))
+```
+
+*Truthfulness & Functionality*  
+We used bars with standard errors visualized as we felt that it best conveyed the statistical comparisons made in the paper.  In this case, infrequent neutral stimuli were jittered with frequent happy stimuli for the purposes of the P3 analysis; hence, we were interested if responses appeared to be significantly different in the frequency condition based on expression.  
+  
+*Beauty*  
+We greyed fonts and used a muted, slightly transparent blue to fill bars to complement the palette while remaining conservative (i.e. not departing greatly from standard scientific visualization technique) in our visualization approach.  We also changed most of the fonts to serif as these are generally easier to read and used more often for scientific audiences.  A caption was used to further elaborate on the individuals under comparison in these visualizations (individuals with low experienced aggression - LHEA < 19 - were excluded in these comparisons).
+  
+*Insightfulness & Ability to Enlighten*  
+The use of a faceted approach allows for easy 3 x 2 comparison of data that cannot necessarily be plotted on a shared axis due to the independence of the groups. Since the basic shapes of all six of the plots appear similar enough for an at-a-glance comparison to be made, we felt that this allowed an immediate understanding of the commonalities across condition while allowing one to gaze further and pick up differences.
